@@ -4,8 +4,8 @@ This repository is used for compressing retrieved collection which further is us
 ### Procedure
 #### step 1. Clone repository and update submodules
 ```bash
-git clone --recurse-submodules https://github.com/boostcampaitech5/level3_nlp_finalproject-nlp-11.git
-cd retrieved_collection_compression_densephrase
+git clone https://github.com/boostcampaitech5/level3_nlp_finalproject-nlp-11.git
+cd level3_nlp_finalproject
 ```
 
 #### step 2. Setup docker environment
