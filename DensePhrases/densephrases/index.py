@@ -134,6 +134,8 @@ class MIPS(object):
             
         offsets = (I / max_idx).astype(np.int64) * int(max_idx)
         idxs = I % int(max_idx)
+        #self.idx_f[str(offset)]['doc']: Index2doc
+        #self.idx_f[str(offset)]['word']: Index2word
         doc = np.array(
             [[self.idx_f[str(offset)]['doc'][idx] for offset, idx in zip(oo, ii)] for oo, ii in zip(offsets, idxs)])
         word = np.array([[self.idx_f[str(offset)]['word'][idx] for offset, idx in zip(oo, ii)] for oo, ii in
@@ -186,6 +188,8 @@ class MIPS(object):
         each['end_pos'] -= sents[sent_idxs[0]][1]
         return each
 
+    # modifyable
+    # search start_top-k, end_top-k per query
     def search_dense(self, query, q_texts, nprobe=256, top_k=10):
         batch_size, d = query.shape
         # self.index.nprobe = nprobe # For OPQ, this is already set as 256
@@ -204,7 +208,7 @@ class MIPS(object):
 
         # Get idxs from resulting I
         start_time = time()
-        b_start_doc_idxs, b_start_idxs = self.get_idxs(start_I)
+        b_start_doc_idxs, b_start_idxs = self.get_idxs(start_I)# doc and word the token belongs to
         b_end_doc_idxs, b_end_idxs = self.get_idxs(end_I)
 
         # Number of unique docs
@@ -214,9 +218,10 @@ class MIPS(object):
         ) / batch_size
         self.num_docs_list.append(num_docs)
         logger.debug(f'2) {time()-start_time:.3f}s: get index')
-
+        #b_start_doc_idxs: document id b_start_idxs: word index start_I: 
         return b_start_doc_idxs, b_start_idxs, start_I, b_end_doc_idxs, b_end_idxs, end_I, b_start_scores, b_end_scores
 
+    # modifyable
     def search_phrase(self, query, start_doc_idxs, start_idxs, orig_start_idxs, end_doc_idxs, end_idxs, orig_end_idxs,
             start_scores, end_scores, top_k=10, max_answer_length=10, return_idxs=False, return_sent=False):
 
@@ -274,11 +279,19 @@ class MIPS(object):
 
         # Get metadata from RAM
         else:
+            # key: doc_idx value: doc_idx
+                            # 'word2char_start': word2char_start,
+                            # 'word2char_end': word2char_end,
+                            # 'f2o_start': f2o_start,
+                            # 'context': context,
+                            # 'title': title,
+                            # 'offset': -2,
+                            # 'scale': 20,
             groups_all = {
                 doc_idx: self.decompress_meta(str(doc_idx))
                 for doc_idx in set(start_doc_idxs.tolist() + end_doc_idxs.tolist()) if doc_idx >= 0
             }
-            groups_start = []
+            groups_start = [] # passage_vector[start: start_idx+max_answer_length] <- end candidates
             for doc_idx, start_idx in zip(start_doc_idxs, orig_start_idxs):
                 reconsts = []
                 for ii in range(start_idx, start_idx+max_answer_length):
@@ -288,7 +301,7 @@ class MIPS(object):
                         reconst = np.zeros(bs)
                     reconsts.append(reconst)
                 groups_start.append({'end': np.array(reconsts)})
-            groups_end = []
+            groups_end = [] # passage_vector[end_idx-max_answer_length + 1: end + 1] <- start candidates
             for doc_idx, end_idx in zip(end_doc_idxs, orig_end_idxs):
                 reconsts = []
                 for ii in range(end_idx-max_answer_length+1, end_idx+1):
@@ -340,7 +353,9 @@ class MIPS(object):
             end = end.matmul(self.R) # for OPQ
             query_end = torch.FloatTensor(query_end).to(self.device)
             new_end_scores = (query_end.unsqueeze(1) * end).sum(2).cpu().numpy()
-        scores1 = np.expand_dims(start_scores, 1) + new_end_scores + end_mask  # [Q, L]
+        # [Q(batch_size * top-k = 12800), L(max_length = 10)]
+        # scores1: searched_start_score + end_candidate_score
+        scores1 = np.expand_dims(start_scores, 1) + new_end_scores + end_mask  
         pred_end_idxs = np.stack([each[idx] for each, idx in zip(new_end_idxs, np.argmax(scores1, 1))], 0)  # [Q]
         pred_end_vecs = np.stack([each[idx] for each, idx in zip(end.cpu().numpy(), np.argmax(scores1, 1))], 0)
         logger.debug(f'2) {time()-start_time:.3f}s: find end')
@@ -446,7 +461,8 @@ class MIPS(object):
         results = sorted(results, key=lambda each_out: -each_out['score'])
         results = list(filter(lambda x: x['score'] > -1e5, results)) # not exactly top-k but will be cut during evaluation
         return results
-
+    
+    #nprobe: number of clusters to find
     def search(self, query, q_texts=None,
                nprobe=256, top_k=10,
                aggregate=False, return_idxs=False,
@@ -454,6 +470,7 @@ class MIPS(object):
 
         # MIPS on start/end
         start_time = time()
+        #top-k high score start, end return
         start_doc_idxs, start_idxs, start_I, end_doc_idxs, end_idxs, end_I, start_scores, end_scores = self.search_dense(
             query,
             q_texts=q_texts,

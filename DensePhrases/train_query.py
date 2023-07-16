@@ -178,7 +178,7 @@ def train_query_encoder(args, mips=None):
     print()
     logger.info(f"Best model has acc {best_acc:.3f} saved as {save_path}")
 
-
+    # modifyable
 def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, tokenizer, batch_size, args):
     # Search
     step = batch_size
@@ -188,10 +188,14 @@ def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, toke
         query_encoder=query_encoder, tokenizer=tokenizer, args=args, batch_size=batch_size
     )
     for q_idx in tqdm(range(0, len(questions), step)):
-        outs = query2vec(questions[q_idx:q_idx+step])
+        outs = query2vec(questions[q_idx:q_idx+step]) 
+        # batch size query vector list 
+        # out[0]: start vector 
+        # out[1]: end vector 
+        # out[2]: decoded sentence
         start = np.concatenate([out[0] for out in outs], 0)
         end = np.concatenate([out[1] for out in outs], 0)
-        query_vec = np.concatenate([start, end], 1)
+        query_vec = np.concatenate([start, end], 1) #shape: (batch_size, 2*d_model)
 
         outs = search_fn(
             query_vec,
@@ -204,7 +208,7 @@ def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, toke
             titles[q_idx:q_idx+step], outs
         )
 
-
+    # modifyable
 def annotate_phrase_vecs(mips, q_ids, questions, answers, titles, phrase_groups, args):
     assert mips is not None
     batch_size = len(answers)

@@ -366,6 +366,7 @@ class Encoder(PreTrainedModel):
             outputs = (total_loss,) + outputs
         return outputs  # (loss), start_logits, end_logits, filter_start_logits, filter_end_logits
 
+    # modifyable
     def train_query(
         self,
         input_ids_=None, attention_mask_=None, token_type_ids_=None,
@@ -380,19 +381,26 @@ class Encoder(PreTrainedModel):
         # Compute query embedding
         query_start, query_end = self.embed_query(input_ids_, attention_mask_, token_type_ids_)
 
-        # Start/end dense logits
+        # start/end dense logits
+        # start_logits shape: [128(batch size), 1(cls token), 768(d_model)] 
+        # start_vecs shape: [128(batch size), 200(top-k), 768(d_model)] 
         start_logits = query_start.matmul(start_vecs.transpose(1, 2)).squeeze(1)
         end_logits = query_end.matmul(end_vecs.transpose(1, 2)).squeeze(1)
         logits = start_logits + end_logits
 
         # L_phrase: MML over phrase-level annotation
+        # p_targets: index(predicted_phrases in annotated documents(golden passage))
+        # targets: index(groundtruth == predicted_phrases)
         log_probs = 0.0
         MIN_PROB = 1e-7
         if not all([len(t) == 0 for t in targets]):
+            # log_probs: top-k candidates 중 positive target의 log_prob
+            # 0 < len(log_probs) <= batch size
             log_probs = [
                 -torch.log(softmax(lg, -1)[tg.long()].sum().clamp(MIN_PROB, 1)) for lg, tg in zip(logits, targets)
                 if len(tg) > 0
             ]
+            # log_probs type: scalar tensor
             log_probs = sum(log_probs)/len(log_probs)
 
             # Start/End only loss
