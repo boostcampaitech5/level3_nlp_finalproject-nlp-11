@@ -1,2 +1,6 @@
-
-run.tsv
+**/cache/
+**/__pycache__/
+**/densephrases-data/
+**/densephrases.egg-info/
+**/outputs/
+**/runs/

@@ -204,9 +204,10 @@ def evaluate_results(predictions, qids, questions, answers, args, evidences, sco
         with open(pred_path, 'w') as f:
             json.dump(pred_out, f)
 
-    # Evaluate passage retrieval
-    if args.eval_psg:
-        evaluate_results_psg(pred_path, args)
+        # TODO: add psg metric
+        # # Evaluate passage retrieval
+        # if args.eval_psg:
+        #     evaluate_results_psg(pred_path, args)
 
     return exact_match_top1, f1_score_top1, exact_match_topk, f1_score_topk
 

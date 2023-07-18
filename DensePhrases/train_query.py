@@ -10,6 +10,7 @@ import math
 import copy
 import string
 import faiss
+from torch import amp
 
 from time import time
 from tqdm import tqdm
@@ -17,7 +18,7 @@ from densephrases.utils.squad_utils import get_question_dataloader
 from densephrases.utils.single_utils import load_encoder
 from densephrases.utils.open_utils import load_phrase_index, get_query2vec, load_qa_pairs
 from densephrases.utils.eval_utils import drqa_exact_match_score, drqa_regex_match_score, \
-                                          drqa_metric_max_over_ground_truths
+                                          drqa_metric_max_over_ground_truths, normalize_answer
 from eval_phrase_retrieval import evaluate
 from densephrases import Options
 
@@ -32,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 
 def train_query_encoder(args, mips=None):
+    # TODO: log to wandb
     # Freeze one for MIPS
     device = 'cuda' if args.cuda else 'cpu'
     logger.info("Loading pretrained encoder: this one is for MIPS (fixed)")
@@ -78,7 +80,13 @@ def train_query_encoder(args, mips=None):
 
     # Train arguments
     args.per_gpu_train_batch_size = int(args.per_gpu_train_batch_size / args.gradient_accumulation_steps)
-    best_acc = -1000.0
+    if args.eval_psg:
+        # TODO: add psg metric
+        # loss
+        metric = 1e9
+    else:
+        # best_acc
+        metric = -1000.0
     for ep_idx in range(int(args.num_train_epochs)):
 
         # Training
@@ -157,26 +165,41 @@ def train_query_encoder(args, mips=None):
         # Evaluation
         new_args = copy.deepcopy(args)
         new_args.top_k = 10
-        new_args.save_pred = False
+        # TODO: split save_pred arg
+        if not args.eval_psg:
+            new_args.save_pred = False
+        else:
+            new_args.save_pred = True
         new_args.test_path = args.dev_path
         dev_em, dev_f1, dev_emk, dev_f1k = evaluate(new_args, mips, target_encoder, tokenizer)
         logger.info(f"Develoment set acc@1: {dev_em:.3f}, f1@1: {dev_f1:.3f}")
 
         # Save best model
-        if dev_em > best_acc:
-            best_acc = dev_em
-            save_path = args.output_dir
-            if not os.path.exists(save_path):
-                os.makedirs(save_path)
-            target_encoder.save_pretrained(save_path)
-            logger.info(f"Saved best model with acc {best_acc:.3f} into {save_path}")
+        # TODO: change saving checkpoint from epoch to step
+        # TODO: modularize save function
+        if args.eval_psg:
+            if total_loss/step_idx < metric:
+                metric = total_loss/step_idx
+                save_path = args.output_dir
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+                target_encoder.save_pretrained(save_path)
+                logger.info(f"Saved best model with loss {metric:.3f} into {save_path}")
+        else:
+            if dev_em > metric:
+                metric = dev_em
+                save_path = args.output_dir
+                if not os.path.exists(save_path):
+                    os.makedirs(save_path)
+                target_encoder.save_pretrained(save_path)
+                logger.info(f"Saved best model with acc {metric:.3f} into {save_path}")
 
         if (ep_idx + 1) % 1 == 0:
             logger.info('Updating pretrained encoder')
             pretrained_encoder = copy.deepcopy(target_encoder)
 
     print()
-    logger.info(f"Best model has acc {best_acc:.3f} saved as {save_path}")
+    logger.info(f"Best model has {'loss' if args.eval_psg else 'acc'} {metric:.3f} saved as {save_path}")
 
     # modifyable
 def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, tokenizer, batch_size, args):
@@ -202,6 +225,7 @@ def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, toke
             q_texts=questions[q_idx:q_idx+step], nprobe=args.nprobe,
             top_k=args.top_k, return_idxs=True,
             max_answer_length=args.max_answer_length, aggregate=args.aggregate, agg_strat=args.agg_strat,
+            return_sent = True if args.label_strat == "sent" else False
         )
         yield (
             q_ids[q_idx:q_idx+step], questions[q_idx:q_idx+step], answers[q_idx:q_idx+step],
@@ -257,7 +281,7 @@ def annotate_phrase_vecs(mips, q_ids, questions, answers, titles, phrase_groups,
 
     # TODO: implement dynamic label_strategy based on the task name (label_strat = dynamic)
 
-    # Annotate for L_phrase
+    # Annotate for L_phrase / L_sent
     if 'phrase' in args.label_strat.split(','):
         match_fns = [
             drqa_regex_match_score if args.regex or ('trec' in q_id.lower()) else drqa_exact_match_score for q_id in q_ids
@@ -265,6 +289,12 @@ def annotate_phrase_vecs(mips, q_ids, questions, answers, titles, phrase_groups,
         targets = [
             [drqa_metric_max_over_ground_truths(match_fn, phrase['answer'], answer_set) for phrase in phrase_group]
             for phrase_group, answer_set, match_fn in zip(phrase_groups, answers, match_fns)
+        ]
+        targets = [[ii if val else None for ii, val in enumerate(target)] for target in targets]
+    elif 'sent' in args.label_strat.split(','):
+        targets = [
+            [any(normalize_answer(answer) in normalize_answer(phrase['context']) for answer in answer_set) for phrase in phrase_group]
+            for phrase_group, answer_set in zip(phrase_groups, answers)
         ]
         targets = [[ii if val else None for ii, val in enumerate(target)] for target in targets]
 
