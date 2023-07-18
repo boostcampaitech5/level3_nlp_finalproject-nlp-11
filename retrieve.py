@@ -7,6 +7,8 @@ from tqdm import tqdm
 
 from densephrases import DensePhrases # note that DensePhrases is installed with editable mode
 
+# TODO: add logger / logging to wandb
+
 # fixed setting
 R_UNIT='sentence'
 TOP_K=200
