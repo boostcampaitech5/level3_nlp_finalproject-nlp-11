@@ -138,7 +138,7 @@ def squad_convert_example_to_features(example, max_seq_length, doc_stride, max_q
             non_padded_ids_ = query_dict["input_ids"][: query_dict["input_ids"].index(tokenizer.pad_token_id)]
         else:
             non_padded_ids_ = query_dict["input_ids"]
-        tokens_ = tokenizer.convert_ids_to_tokens(non_padded_ids_)
+        tokens_ = tokenizer.convert_ids_to_tokens(non_padded_ids_) #decode
 
     # Context Features
     if not question_only:
@@ -1619,7 +1619,7 @@ def read_text_examples(input_file, draft=False, draft_num_examples=12):
 
 
 def get_question_dataloader(questions, tokenizer, max_query_length=64, batch_size=64):
-    examples = [SquadExample(qas_id=q_idx, question_text=q) for q_idx, q in enumerate(questions)]
+    examples = [SquadExample(qas_id=q_idx, question_text=q) for q_idx, q in enumerate(questions)] #context_text, question_text
     features, dataset = squad_convert_examples_to_features(
         examples=examples,
         tokenizer=tokenizer,
