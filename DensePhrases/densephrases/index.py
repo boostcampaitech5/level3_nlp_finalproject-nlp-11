@@ -221,9 +221,17 @@ class MIPS(object):
         #b_start_doc_idxs: document id b_start_idxs: word index start_I: 
         return b_start_doc_idxs, b_start_idxs, start_I, b_end_doc_idxs, b_end_idxs, end_I, b_start_scores, b_end_scores
 
+    def rerank_by_sentence_len_penalty(self, out):
+        k1 = 1.2
+        b = 0.75
+        avgFieldLen = 20.87
+
+        for each in out:
+            each['score'] = (each['score'] * (k1 + 1)) / (each['score'] + (k1 * (1 - b + (b * (len(each['context'].split()) / avgFieldLen)))))
+
     # modifyable
     def search_phrase(self, query, start_doc_idxs, start_idxs, orig_start_idxs, end_doc_idxs, end_idxs, orig_end_idxs,
-            start_scores, end_scores, top_k=10, max_answer_length=10, return_idxs=False, return_sent=False):
+            start_scores, end_scores, top_k=10, max_answer_length=10, return_idxs=False, return_sent=False, rerank_by_sentence_len_penalty=False):
 
         # Reshape for phrase
         num_queries = query.shape[0]
@@ -426,6 +434,9 @@ class MIPS(object):
         if return_sent:
             out = [self.adjust_sent(each) for each in out]
 
+        if rerank_by_sentence_len_penalty:
+            self.rerank_by_sentence_len_penalty(out)
+
         # Sort output
         new_out = [[] for _ in range(num_queries)]
         for idx, each_out in zip(q_idxs, out):
@@ -466,7 +477,7 @@ class MIPS(object):
     def search(self, query, q_texts=None,
                nprobe=256, top_k=10,
                aggregate=False, return_idxs=False,
-               max_answer_length=10, agg_strat='opt1', return_sent=False):
+               max_answer_length=10, agg_strat='opt1', return_sent=False, rerank_by_sentence_len_penalty=False):
 
         # MIPS on start/end
         start_time = time()
@@ -483,9 +494,11 @@ class MIPS(object):
         start_time = time()
         outs = self.search_phrase(
             query, start_doc_idxs, start_idxs, start_I, end_doc_idxs, end_idxs, end_I, start_scores, end_scores,
-            top_k=top_k, max_answer_length=max_answer_length, return_idxs=return_idxs, return_sent=return_sent
+            top_k=top_k, max_answer_length=max_answer_length, return_idxs=return_idxs, return_sent=return_sent, rerank_by_sentence_len_penalty=rerank_by_sentence_len_penalty
         )
         logger.debug(f'Top-{top_k} phrase search: {time()-start_time:.3f}s')
+
+        outs = [e[:top_k] for e in outs]
 
         # Aggregate
         if aggregate:

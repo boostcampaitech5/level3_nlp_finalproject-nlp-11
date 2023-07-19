@@ -52,7 +52,7 @@ class DensePhrases(object):
         self.truecase = TrueCaser(os.path.join(os.environ['DATA_DIR'], self.args.truecase_path))
         print("Loading DensePhrases Completed!")
 
-    def search(self, query='', retrieval_unit='phrase', top_k=10, truecase=True, return_meta=False):
+    def search(self, query='', retrieval_unit='phrase', top_k=10, truecase=True, return_meta=False, rerank_by_sentence_len_penalty=False):
         # If query is str, single query
         single_query = False
         if type(query) == str:
@@ -83,10 +83,13 @@ class DensePhrases(object):
             query_vec, q_texts=batch_query, nprobe=256,
             top_k=search_top_k, max_answer_length=10,
             return_idxs=False, aggregate=True, agg_strat=agg_strats[retrieval_unit],
-            return_sent=True if retrieval_unit == 'sentence' else False
+            return_sent=True if retrieval_unit == 'sentence' else False,
+            rerank_by_sentence_len_penalty=rerank_by_sentence_len_penalty
         )
 
         # Gather results
+        if rerank_by_sentence_len_penalty:
+            top_k //= 2
         rets = [ret[:top_k] for ret in rets]
         if retrieval_unit == 'phrase':
             retrieved = [[rr['answer'] for rr in ret][:top_k] for ret in rets]

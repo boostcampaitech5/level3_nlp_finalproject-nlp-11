@@ -30,6 +30,10 @@ class Retriever():
         )
 
     def retrieve(self, single_query_or_queries_dict):
+        if self.args.rerank_by_sentence_len_penalty:
+            global TOP_K
+            TOP_K *= 2
+
         queries_batch = []
         if isinstance(single_query_or_queries_dict, dict): # batch search
             queries, qids = single_query_or_queries_dict['queries'], single_query_or_queries_dict['qids']
@@ -48,7 +52,7 @@ class Retriever():
                 idx = 0
                 for batch_query in tqdm(queries_batch):
                     # retrieve
-                    result = self.model.search(batch_query, retrieval_unit=R_UNIT, top_k=TOP_K)
+                    result = self.model.search(batch_query, retrieval_unit=R_UNIT, top_k=TOP_K, rerank_by_sentence_len_penalty=self.args.rerank_by_sentence_len_penalty)
                     
                     # write to runfile
                     for i in range(len(result)):
@@ -58,7 +62,7 @@ class Retriever():
             return None
                             
         elif isinstance(single_query_or_queries_dict, str): # online search
-            result = self.model.search(single_query_or_queries_dict, retrieval_unit=R_UNIT, top_k=TOP_K)
+            result = self.model.search(single_query_or_queries_dict, retrieval_unit=R_UNIT, top_k=TOP_K, rerank_by_sentence_len_penalty=self.args.rerank_by_sentence_len_penalty)
 
             return result
         else:
@@ -80,6 +84,8 @@ if __name__ == "__main__":
                         help="output runfile name which indluces query id and retrieved collection")
     parser.add_argument('--batch_size', type=int, default=1,
                         help="#query to process with parallel processing")
+    parser.add_argument('--rerank_by_sentence_len_penalty', action="store_true",
+                        help="rerank by the length of the sentence")
     
     args = parser.parse_args()
     
