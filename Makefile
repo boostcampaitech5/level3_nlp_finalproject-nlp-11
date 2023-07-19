@@ -72,4 +72,5 @@ train-query: dump-dir model-name nq-open-data large-index
 		--return_sent \
 		--aggregate \
 		--agg_strat opt2 \
+		--wandb \
 		$(OPTIONS)

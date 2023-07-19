@@ -11,6 +11,7 @@ import copy
 import string
 import faiss
 from torch import amp
+import wandb
 
 from time import time
 from tqdm import tqdm
@@ -149,6 +150,9 @@ def train_query_encoder(args, mips=None):
                     pbar.set_description(
                         f"Ep {ep_idx+1} Tr loss: {loss.mean().item():.2f}, acc: {sum(accs)/len(accs):.3f}"
                     )
+                wandb.log( 
+                          {"Tr loss": loss.mean().item(), "acc": sum(accs)/len(accs)} , step=global_step,)
+
 
                 if accs is not None:
                     total_accs += accs
@@ -319,6 +323,9 @@ if __name__ == '__main__':
     options.add_data_options()
     options.add_qsft_options()
     args = options.parse()
+    
+    wandb.init(project="QSFT", entity="line1029-academic-team", name="wandb-test-001", mode="online" if args.wandb else "disabled")
+    wandb.config.update(args)
 
     # Seed for reproducibility
     random.seed(args.seed)
