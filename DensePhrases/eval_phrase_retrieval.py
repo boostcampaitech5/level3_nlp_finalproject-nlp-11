@@ -87,12 +87,7 @@ def evaluate(args, mips=None, query_encoder=None, tokenizer=None, q_idx=None):
         se_poss += se_pos
 
     # logger.info(f"Avg. {sum(mips.num_docs_list)/len(mips.num_docs_list):.2f} number of docs per query")
-    if args.eval_psg:
-        eval_fn = evaluate_results_psg
-    elif args.is_kilt:
-        eval_fn = evaluate_results_kilt
-    else:
-        eval_fn = evaluate_results
+    eval_fn = evaluate_results if not args.is_kilt else evaluate_results_kilt
     return eval_fn(predictions, qids, questions, answers, args, evidences, scores, titles, se_positions=se_poss)
 
 
@@ -209,6 +204,11 @@ def evaluate_results(predictions, qids, questions, answers, args, evidences, sco
         with open(pred_path, 'w') as f:
             json.dump(pred_out, f)
 
+        # TODO: add psg metric
+        # # Evaluate passage retrieval
+        # if args.eval_psg:
+        #     evaluate_results_psg(pred_path, args)
+
     return exact_match_top1, f1_score_top1, exact_match_topk, f1_score_topk
 
 
@@ -301,11 +301,8 @@ def evaluate_results_kilt(predictions, qids, questions, answers, args, evidences
 
     return result['retrieval']['Rprec'], result['retrieval']['recall@5'], result['kilt']['KILT-accuracy'], result['kilt']['KILT-f1']
 
-def evaluate_results_psg(predictions, qids, questions, answers, args, evidences, scores, titles, se_positions=None):
-    
-    return 
 
-def evaluate_results_psg_old(pred_path, args):
+def evaluate_results_psg(pred_path, args):
     # Read prediction
     my_pred = json.load(open(pred_path))
 

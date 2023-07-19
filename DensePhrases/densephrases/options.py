@@ -188,6 +188,9 @@ class Options():
         self.parser.add_argument("--logging_steps", type=int, default=5000, help="Log every X updates steps.")
         self.parser.add_argument("--wandb", action="store_true", help="Whether to use Weights and Biases logging")
         self.parser.add_argument("--save_steps", type=int, default=9999999, help="Save checkpoint every X updates steps.")
+        self.parser.add_argument("--project", type=str, default="QSFT", help="wandb project name")
+        self.parser.add_argument("--entity", type=str, default="line1029-academic-team", help="wandb entity name")
+        self.parser.add_argument("--run_name", type=str, default="Test-001", help="wandb run name")
 
     def add_demo_options(self):
         self.parser.add_argument('--base_ip', default='http://127.0.0.1')

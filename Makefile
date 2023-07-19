@@ -46,6 +46,12 @@ all-open-data:
 	$(eval TEST_DATA=$(TEST_DATA),$(DATA_DIR)/open-qa/triviaqa-unfiltered/test_preprocessed.json)
 	$(eval TEST_DATA=$(TEST_DATA),$(DATA_DIR)/open-qa/squad/test_preprocessed.json)
 	$(eval OPTIONS=--truecase)
+dummy-data:
+	$(eval TRAIN_DATA=open-qa/nq-open/dummy.json)
+	$(eval DEV_DATA=open-qa/nq-open/dummy.json)
+	$(eval TEST_DATA=open-qa/nq-open/dummy.json)
+	$(eval OPTIONS=--truecase)
+
 
 # Query-side fine-tuning
 train-query: dump-dir model-name nq-open-data large-index
@@ -53,10 +59,10 @@ train-query: dump-dir model-name nq-open-data large-index
 		--run_mode train_query \
 		--cache_dir $(CACHE_DIR) \
 		--train_path $(DATA_DIR)/$(TRAIN_DATA) \
-		--per_gpu_train_batch_size 12 \
+		--per_gpu_train_batch_size 128 \
 		--dev_path $(DATA_DIR)/$(DEV_DATA) \
 		--test_path $(DATA_DIR)/$(TEST_DATA) \
-		--eval_batch_size 12 \
+		--eval_batch_size 128 \
 		--learning_rate 3e-5 \
 		--num_train_epochs 5 \
 		--dump_dir $(DUMP_DIR) \
@@ -65,12 +71,7 @@ train-query: dump-dir model-name nq-open-data large-index
 		--output_dir $(SAVE_DIR)/$(MODEL_NAME) \
 		--top_k 10 \
 		--cuda \
-		--save_pred \
-		--label_strat sent \
-		--eval_psg \
-		--psg_top_k 10 \
-		--return_sent \
-		--aggregate \
-		--agg_strat opt2 \
+		--label_strat phrase \
 		--wandb \
+		--save_steps 300 \
 		$(OPTIONS)
