@@ -53,7 +53,7 @@ train-query: dump-dir model-name nq-open-data large-index
 		--run_mode train_query \
 		--cache_dir $(CACHE_DIR) \
 		--train_path $(DATA_DIR)/$(TRAIN_DATA) \
-		--per_gpu_train_batch_size 16 \
+		--per_gpu_train_batch_size 12 \
 		--dev_path $(DATA_DIR)/$(DEV_DATA) \
 		--test_path $(DATA_DIR)/$(TEST_DATA) \
 		--eval_batch_size 12 \
@@ -63,7 +63,13 @@ train-query: dump-dir model-name nq-open-data large-index
 		--index_name start/$(NUM_CLUSTERS)_flat_$(INDEX_TYPE)_small \
 		--load_dir $(LOAD_DIR_OR_PRETRAINED_HF_NAME) \
 		--output_dir $(SAVE_DIR)/$(MODEL_NAME) \
-		--top_k 100 \
+		--top_k 10 \
 		--cuda \
 		--save_pred \
+		--label_strat sent \
+		--eval_psg \
+		--psg_top_k 10 \
+		--return_sent \
+		--aggregate \
+		--agg_strat opt2 \
 		$(OPTIONS)

@@ -80,6 +80,7 @@ def train_query_encoder(args, mips=None):
 
     # Train arguments
     args.per_gpu_train_batch_size = int(args.per_gpu_train_batch_size / args.gradient_accumulation_steps)
+    global_step = 0
     if args.eval_psg:
         # TODO: add psg metric
         # loss
@@ -156,6 +157,16 @@ def train_query_encoder(args, mips=None):
                     total_accs += [0.0]*len(tgts_t)
                     total_accs_k += [0.0]*len(tgts_t)
 
+                global_step += 1
+                # Save best model
+                if args.save_steps and not global_step % args.save_steps:
+                    if args.eval_psg and total_loss/step_idx < metric:
+                        metric = total_loss/step_idx
+                        save_model(args, global_step, metric, target_encoder)
+                    elif dev_em > metric:
+                        metric = dev_em
+                        save_model(args, global_step, metric, target_encoder)
+
         step_idx += 1
         logger.info(
             f"Avg train loss ({step_idx} iterations): {total_loss/step_idx:.2f} | train " +
@@ -174,32 +185,22 @@ def train_query_encoder(args, mips=None):
         dev_em, dev_f1, dev_emk, dev_f1k = evaluate(new_args, mips, target_encoder, tokenizer)
         logger.info(f"Develoment set acc@1: {dev_em:.3f}, f1@1: {dev_f1:.3f}")
 
-        # Save best model
-        # TODO: change saving checkpoint from epoch to step
-        # TODO: modularize save function
-        if args.eval_psg:
-            if total_loss/step_idx < metric:
-                metric = total_loss/step_idx
-                save_path = args.output_dir
-                if not os.path.exists(save_path):
-                    os.makedirs(save_path)
-                target_encoder.save_pretrained(save_path)
-                logger.info(f"Saved best model with loss {metric:.3f} into {save_path}")
-        else:
-            if dev_em > metric:
-                metric = dev_em
-                save_path = args.output_dir
-                if not os.path.exists(save_path):
-                    os.makedirs(save_path)
-                target_encoder.save_pretrained(save_path)
-                logger.info(f"Saved best model with acc {metric:.3f} into {save_path}")
 
         if (ep_idx + 1) % 1 == 0:
             logger.info('Updating pretrained encoder')
             pretrained_encoder = copy.deepcopy(target_encoder)
 
     print()
-    logger.info(f"Best model has {'loss' if args.eval_psg else 'acc'} {metric:.3f} saved as {save_path}")
+    logger.info(f"Best model has metric {metric:.3f} saved into {args.output_dir}")
+
+
+def save_model(args, global_step, metric, model):
+    save_path = os.path.join(args.output_dir, f"step_{global_step}_metric_{metric:.2f}")
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+    model.save_pretrained(save_path)
+    logger.info(f"Saved best model with metric {metric:.3f} into {save_path}")
+
 
     # modifyable
 def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, tokenizer, batch_size, args):
@@ -331,11 +332,11 @@ if __name__ == '__main__':
         mips = load_phrase_index(args)
         train_query_encoder(args, mips)
 
-        # Eval
-        args.load_dir = args.output_dir
-        logger.info(f"Evaluating {args.load_dir}")
-        args.top_k = 10
-        evaluate(args, mips)
+        # # Eval
+        # args.load_dir = args.output_dir
+        # logger.info(f"Evaluating {args.load_dir}")
+        # args.top_k = 10
+        # evaluate(args, mips)
 
     else:
         raise NotImplementedError
