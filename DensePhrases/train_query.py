@@ -50,9 +50,9 @@ def train_query_encoder(args, mips=None):
 
     # Optimizer setting
     def is_train_param(name):
-        if name.endswith(".embeddings.word_embeddings.weight"):
-            logger.info(f'freezing {name}')
-            return False
+        # if name.endswith(".embeddings.word_embeddings.weight"):
+        #     logger.info(f'freezing {name}')
+        #     return False
         return True
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [{
@@ -89,13 +89,13 @@ def train_query_encoder(args, mips=None):
     else:
         # best_acc
         metric = -1000.0
+
+    # Training
+    total_loss = 0.0
+    total_accs = []
+    total_accs_k = []
+
     for ep_idx in range(int(args.num_train_epochs)):
-
-        # Training
-        total_loss = 0.0
-        total_accs = []
-        total_accs_k = []
-
         # Load training dataset
         q_ids, questions, answers, titles = load_qa_pairs(args.train_path, args, shuffle=True)
         pbar = tqdm(get_top_phrases(
@@ -164,30 +164,35 @@ def train_query_encoder(args, mips=None):
                 global_step += 1
                 # Save best model
                 if args.save_steps and not global_step % args.save_steps:
-                    if args.eval_psg and total_loss/step_idx < metric:
-                        metric = total_loss/step_idx
+                    if args.eval_psg and total_loss/args.save_steps < metric:
+                        metric = total_loss/args.save_steps
                         save_model(args, global_step, metric, target_encoder)
-                    elif dev_em > metric:
-                        metric = dev_em
+                    elif not args.eval_psg and sum(total_accs_k)/len(total_accs_k) > metric:
+                        metric = sum(total_accs_k)/len(total_accs_k)
                         save_model(args, global_step, metric, target_encoder)
 
-        step_idx += 1
-        logger.info(
-            f"Avg train loss ({step_idx} iterations): {total_loss/step_idx:.2f} | train " +
-            f"acc@1: {sum(total_accs)/len(total_accs):.3f} | acc@{args.top_k}: {sum(total_accs_k)/len(total_accs_k):.3f}"
-        )
+                    logger.info(
+                        f"Avg train loss ({global_step} iterations): {total_loss/args.save_steps:.2f} | train " +
+                        f"acc@1: {sum(total_accs)/len(total_accs):.3f} | acc@{args.top_k}: {sum(total_accs_k)/len(total_accs_k):.3f}"
+                    )
+                    wandb.log( 
+                          {"acc@1_avg": sum(total_accs)/len(total_accs), f"acc@{args.top_k}_avg": sum(total_accs_k)/len(total_accs_k), "Tr loss_avg":total_loss/args.save_steps} , step=global_step,)
+                    total_loss = 0.0
+                    total_accs = []
+                    total_accs_k = []
 
-        # Evaluation
-        new_args = copy.deepcopy(args)
-        new_args.top_k = 10
-        # TODO: split save_pred arg
-        if not args.eval_psg:
-            new_args.save_pred = False
-        else:
-            new_args.save_pred = True
-        new_args.test_path = args.dev_path
-        dev_em, dev_f1, dev_emk, dev_f1k = evaluate(new_args, mips, target_encoder, tokenizer)
-        logger.info(f"Develoment set acc@1: {dev_em:.3f}, f1@1: {dev_f1:.3f}")
+
+        # # Evaluation
+        # new_args = copy.deepcopy(args)
+        # new_args.top_k = 10
+        # # TODO: split save_pred arg
+        # if not args.eval_psg:
+        #     new_args.save_pred = False
+        # else:
+        #     new_args.save_pred = True
+        # new_args.test_path = args.dev_path
+        # dev_em, dev_f1, dev_emk, dev_f1k = evaluate(new_args, mips, target_encoder, tokenizer)
+        # logger.info(f"Develoment set acc@1: {dev_em:.3f}, f1@1: {dev_f1:.3f}")
 
 
         if (ep_idx + 1) % 1 == 0:
@@ -199,11 +204,15 @@ def train_query_encoder(args, mips=None):
 
 
 def save_model(args, global_step, metric, model):
+    if args.eval_psg:
+        m = "loss"
+    else:
+        m = "acc"
     save_path = os.path.join(args.output_dir, f"step_{global_step}_metric_{metric:.2f}")
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     model.save_pretrained(save_path)
-    logger.info(f"Saved best model with metric {metric:.3f} into {save_path}")
+    logger.info(f"Saved best model with metric {m} {metric:.3f} into {save_path}")
 
 
     # modifyable
@@ -324,7 +333,7 @@ if __name__ == '__main__':
     options.add_qsft_options()
     args = options.parse()
     
-    wandb.init(project="QSFT", entity="line1029-academic-team", name="wandb-test-001", mode="online" if args.wandb else "disabled")
+    wandb.init(project=args.project, entity=args.entity, name=args.run_name, mode="online" if args.wandb else "disabled")
     wandb.config.update(args)
 
     # Seed for reproducibility
