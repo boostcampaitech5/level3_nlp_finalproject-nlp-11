@@ -38,11 +38,8 @@ def train_query_encoder(args, mips=None):
     # Freeze one for MIPS
     device = 'cuda' if args.cuda else 'cpu'
     logger.info("Loading pretrained encoder: this one is for MIPS (fixed)")
-    pretrained_encoder, tokenizer, _ = load_encoder(device, args)
+    target_encoder, tokenizer, _ = load_encoder(device, args)
 
-    # Train a copy of it
-    logger.info("Copying target encoder")
-    target_encoder = copy.deepcopy(pretrained_encoder)
 
     # MIPS
     if mips is None:
@@ -50,9 +47,12 @@ def train_query_encoder(args, mips=None):
 
     # Optimizer setting
     def is_train_param(name):
-        # if name.endswith(".embeddings.word_embeddings.weight"):
-        #     logger.info(f'freezing {name}')
-        #     return False
+        if name.startswith("phrase_encoder"):
+            logger.info(f'freezing {name}')
+            return False
+        if name.endswith(".embeddings.word_embeddings.weight"):
+            logger.info(f'freezing {name}')
+            return False
         return True
     no_decay = ["bias", "LayerNorm.weight"]
     optimizer_grouped_parameters = [{
@@ -99,7 +99,7 @@ def train_query_encoder(args, mips=None):
         # Load training dataset
         q_ids, questions, answers, titles = load_qa_pairs(args.train_path, args, shuffle=True)
         pbar = tqdm(get_top_phrases(
-            mips, q_ids, questions, answers, titles, pretrained_encoder, tokenizer,
+            mips, q_ids, questions, answers, titles, target_encoder, tokenizer,
             args.per_gpu_train_batch_size, args)
         )
 
@@ -151,7 +151,7 @@ def train_query_encoder(args, mips=None):
                         f"Ep {ep_idx+1} Tr loss: {loss.mean().item():.2f}, acc: {sum(accs)/len(accs):.3f}"
                     )
                 wandb.log( 
-                          {"Tr loss": loss.mean().item(), "acc": sum(accs)/len(accs)} , step=global_step,)
+                          {"Tr loss": loss.mean().item(), "acc": sum(accs)/len(accs), "lr":optimizer.param_groups[0]['lr']} , step=global_step,)
 
 
                 if accs is not None:
@@ -164,10 +164,10 @@ def train_query_encoder(args, mips=None):
                 global_step += 1
                 # Save best model
                 if args.save_steps and not global_step % args.save_steps:
-                    if args.eval_psg and total_loss/args.save_steps < metric:
+                    if args.eval_psg:
                         metric = total_loss/args.save_steps
                         save_model(args, global_step, metric, target_encoder)
-                    elif not args.eval_psg and sum(total_accs_k)/len(total_accs_k) > metric:
+                    else:
                         metric = sum(total_accs_k)/len(total_accs_k)
                         save_model(args, global_step, metric, target_encoder)
 
@@ -194,10 +194,6 @@ def train_query_encoder(args, mips=None):
         # dev_em, dev_f1, dev_emk, dev_f1k = evaluate(new_args, mips, target_encoder, tokenizer)
         # logger.info(f"Develoment set acc@1: {dev_em:.3f}, f1@1: {dev_f1:.3f}")
 
-
-        if (ep_idx + 1) % 1 == 0:
-            logger.info('Updating pretrained encoder')
-            pretrained_encoder = copy.deepcopy(target_encoder)
 
     print()
     logger.info(f"Best model has metric {metric:.3f} saved into {args.output_dir}")
