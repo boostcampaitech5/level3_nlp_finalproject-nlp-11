@@ -64,14 +64,17 @@ train-query: dump-dir model-name nq-open-data large-index
 		--test_path $(DATA_DIR)/$(TEST_DATA) \
 		--eval_batch_size 128 \
 		--learning_rate 3e-5 \
-		--num_train_epochs 5 \
+		--num_train_epochs 3 \
 		--dump_dir $(DUMP_DIR) \
 		--index_name start/$(NUM_CLUSTERS)_flat_$(INDEX_TYPE)_small \
 		--load_dir $(LOAD_DIR_OR_PRETRAINED_HF_NAME) \
 		--output_dir $(SAVE_DIR)/$(MODEL_NAME) \
-		--top_k 10 \
+		--top_k 100 \
 		--cuda \
 		--label_strat phrase \
 		--wandb \
 		--save_steps 300 \
+		--project $(PROJECT_NAME) \
+		--entity $(ENTITY_NAME) \
+		--run_name $(RUN_NAME) \
 		$(OPTIONS)
