@@ -2,12 +2,10 @@ import os
 import argparse
 import json
 import sys
-
+import logging
 from tqdm import tqdm
 
 from densephrases import DensePhrases # note that DensePhrases is installed with editable mode
-
-# TODO: add logger / logging to wandb
 
 # fixed setting
 R_UNIT='sentence'
@@ -15,6 +13,11 @@ TOP_K=200
 DUMP_DIR='DensePhrases/outputs/densephrases-multi_wiki-20181220/dump'
 RUNFILE_DIR="runs"
 os.makedirs(RUNFILE_DIR, exist_ok=True)
+
+logging.basicConfig(format='%(asctime)s - %(levelname)s - %(name)s -   %(message)s', datefmt='%m/%d/%Y %H:%M:%S',
+                    level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class Retriever():
     def __init__(self, args):
@@ -105,6 +108,7 @@ if __name__ == "__main__":
         inputs = args.single_query
 
     # initialize retriever
+    logger.info("[Retrieve Start]")
     retriever = Retriever(args)
 
     # run
@@ -112,4 +116,4 @@ if __name__ == "__main__":
     if args.single_query is not None:
         print(f"query: {args.single_query}, result: {result}")
 
-
+    logger.info("[Retrieve End]")
