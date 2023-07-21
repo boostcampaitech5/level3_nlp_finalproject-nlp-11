@@ -312,7 +312,7 @@ def annotate_phrase_vecs(mips, q_ids, questions, answers, titles, phrase_groups,
         targets = [[ii if val else None for ii, val in enumerate(target)] for target in targets]
     elif 'sent' in args.label_strat.split(','):
         targets = [
-            [any(normalize_answer(answer) in normalize_answer(phrase['context']) for answer in answer_set) for phrase in phrase_group]
+            [any(answer in phrase['context'] for answer in answer_set) for phrase in phrase_group]
             for phrase_group, answer_set in zip(phrase_groups, answers)
         ]
         targets = [[ii if val else None for ii, val in enumerate(target)] for target in targets]
