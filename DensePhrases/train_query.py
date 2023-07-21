@@ -187,8 +187,21 @@ def train_query_encoder(args, mips=None):
                     logger.info(f"Develoment set dev_acc@1: {dev_top_1_acc:.3f}, dev_acc@{args.dev_top_k}: {dev_top_k_acc:.3f}, dev_recall@{args.dev_top_k}: {dev_top_k_recall:.3f}")
                     wandb.log( 
                             {"dev_acc@1": dev_top_1_acc, "dev_acc@{args.dev_top_k}": dev_top_k_acc, "dev_recall@{args.dev_top_k}": dev_top_k_recall} , step=global_step,)
-
-    print()
+    last_steps = global_step % args.save_steps
+    if not last_steps:
+        last_steps = args.save_steps
+    if args.eval_psg:
+        metric = total_loss/last_steps
+        save_model(args, global_step, metric, target_encoder)
+    else:
+        metric = sum(total_accs_k)/len(total_accs_k)
+        save_model(args, global_step, metric, target_encoder)
+    logger.info(
+        f"Avg train loss ({global_step} iterations): {total_loss/last_steps:.2f} | train " +
+        f"train_acc@1: {sum(total_accs)/len(total_accs):.3f} | train_acc@{args.top_k}: {sum(total_accs_k)/len(total_accs_k):.3f}"
+    )
+    wandb.log( 
+            {"train_acc@1": sum(total_accs)/len(total_accs), f"train_acc@{args.top_k}": sum(total_accs_k)/len(total_accs_k), "train_loss_avg":total_loss/last_steps} , step=global_step,)
     logger.info(f"Best model has metric {metric:.3f} saved into {args.output_dir}")
 
 def dev_eval(args, mips, target_encoder, tokenizer):
