@@ -183,10 +183,10 @@ def train_query_encoder(args, mips=None):
                 
                 if args.eval_steps and not global_step % args.eval_steps:
                     # Evaluation
-                    dev_top_1_acc, dev_top_k_acc = dev_eval(args, mips, target_encoder, tokenizer)
-                    logger.info(f"Develoment set dev_acc@1: {dev_top_1_acc:.3f}, dev_acc@{args.dev_top_k}: {dev_top_k_acc:.3f}")
+                    dev_top_1_acc, dev_top_k_acc, dev_top_k_recall = dev_eval(args, mips, target_encoder, tokenizer)
+                    logger.info(f"Develoment set dev_acc@1: {dev_top_1_acc:.3f}, dev_acc@{args.dev_top_k}: {dev_top_k_acc:.3f}, dev_recall@{args.dev_top_k}: {dev_top_k_recall:.3f}")
                     wandb.log( 
-                            {"dev_acc@1": dev_top_1_acc, "dev_acc@{args.dev_top_k}": dev_top_k_acc} , step=global_step,)
+                            {"dev_acc@1": dev_top_1_acc, "dev_acc@{args.dev_top_k}": dev_top_k_acc, "dev_recall@{args.dev_top_k}": dev_top_k_recall} , step=global_step,)
 
     print()
     logger.info(f"Best model has metric {metric:.3f} saved into {args.output_dir}")
@@ -203,9 +203,10 @@ def dev_eval(args, mips, target_encoder, tokenizer):
             [any(answer in phrase['context'] for answer in answer_set) for phrase in phrase_group]
             for phrase_group, answer_set in zip(outs, answers)
         ]
-    top_k_acc = [sum(i)/(args.dev_top_k*2) for i in top_k_boolean]
+    top_k_recall = [sum(i)/(args.dev_top_k*2) for i in top_k_boolean]
+    top_k_acc = [any(i) for i in top_k_boolean]
     top_1_acc = [i[0] for i in top_k_boolean]
-    return sum(top_1_acc)/len(top_1_acc), sum(top_k_acc)/len(top_k_acc) 
+    return sum(top_1_acc)/len(top_1_acc), sum(top_k_acc)/len(top_k_acc), sum(top_k_recall)/len(top_k_recall)
 
 def save_model(args, global_step, metric, model):
     if args.eval_psg:
