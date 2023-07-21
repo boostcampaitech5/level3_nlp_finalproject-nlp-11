@@ -185,12 +185,13 @@ class Options():
         self.parser.add_argument("--adam_epsilon", default=1e-8, type=float, help="Epsilon for Adam optimizer.")
         self.parser.add_argument("--max_grad_norm", default=1.0, type=float, help="Max gradient norm.")
         self.parser.add_argument('--label_strat', default='sent', type=str, help="label strat={phrase|doc|phrase,doc|sent}")
-        self.parser.add_argument("--logging_steps", type=int, default=5000, help="Log every X updates steps.")
+        self.parser.add_argument("--eval_steps", type=int, default=3000, help="evaluate every X updates steps.")
         self.parser.add_argument("--wandb", action="store_true", help="Whether to use Weights and Biases logging")
         self.parser.add_argument("--save_steps", type=int, default=9999999, help="Save checkpoint every X updates steps.")
         self.parser.add_argument("--project", type=str, default="QSFT", help="wandb project name")
         self.parser.add_argument("--entity", type=str, default="line1029-academic-team", help="wandb entity name")
         self.parser.add_argument("--run_name", type=str, default="Test-001", help="wandb run name")
+        self.parser.add_argument("--dev_top_k", type=int, default=10, help="top k for dev set evaluation")
 
     def add_demo_options(self):
         self.parser.add_argument('--base_ip', default='http://127.0.0.1')

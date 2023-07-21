@@ -151,7 +151,7 @@ def train_query_encoder(args, mips=None):
                         f"Ep {ep_idx+1} Tr loss: {loss.mean().item():.2f}, acc: {sum(accs)/len(accs):.3f}"
                     )
                 wandb.log( 
-                          {"Tr loss": loss.mean().item(), "acc": sum(accs)/len(accs), "lr":optimizer.param_groups[0]['lr']} , step=global_step,)
+                          {"train_loss": loss.mean().item(), "train_acc@1_step": sum(accs)/len(accs), "learning_rate":optimizer.param_groups[0]['lr']} , step=global_step,)
 
 
                 if accs is not None:
@@ -173,31 +173,39 @@ def train_query_encoder(args, mips=None):
 
                     logger.info(
                         f"Avg train loss ({global_step} iterations): {total_loss/args.save_steps:.2f} | train " +
-                        f"acc@1: {sum(total_accs)/len(total_accs):.3f} | acc@{args.top_k}: {sum(total_accs_k)/len(total_accs_k):.3f}"
+                        f"train_acc@1: {sum(total_accs)/len(total_accs):.3f} | train_acc@{args.top_k}: {sum(total_accs_k)/len(total_accs_k):.3f}"
                     )
                     wandb.log( 
-                          {"acc@1_avg": sum(total_accs)/len(total_accs), f"acc@{args.top_k}_avg": sum(total_accs_k)/len(total_accs_k), "Tr loss_avg":total_loss/args.save_steps} , step=global_step,)
+                          {"train_acc@1": sum(total_accs)/len(total_accs), f"train_acc@{args.top_k}": sum(total_accs_k)/len(total_accs_k), "train_loss_avg":total_loss/args.save_steps} , step=global_step,)
                     total_loss = 0.0
                     total_accs = []
                     total_accs_k = []
-
-
-        # # Evaluation
-        # new_args = copy.deepcopy(args)
-        # new_args.top_k = 10
-        # # TODO: split save_pred arg
-        # if not args.eval_psg:
-        #     new_args.save_pred = False
-        # else:
-        #     new_args.save_pred = True
-        # new_args.test_path = args.dev_path
-        # dev_em, dev_f1, dev_emk, dev_f1k = evaluate(new_args, mips, target_encoder, tokenizer)
-        # logger.info(f"Develoment set acc@1: {dev_em:.3f}, f1@1: {dev_f1:.3f}")
-
+                
+                if args.eval_steps and not global_step % args.eval_steps:
+                    # Evaluation
+                    dev_top_1_acc, dev_top_k_acc = dev_eval(args, mips, target_encoder, tokenizer)
+                    logger.info(f"Develoment set dev_acc@1: {dev_top_1_acc:.3f}, dev_acc@{args.dev_top_k}: {dev_top_k_acc:.3f}")
+                    wandb.log( 
+                            {"dev_acc@1": dev_top_1_acc, "dev_acc@{args.dev_top_k}": dev_top_k_acc} , step=global_step,)
 
     print()
     logger.info(f"Best model has metric {metric:.3f} saved into {args.output_dir}")
 
+def dev_eval(args, mips, target_encoder, tokenizer):
+    q_ids, questions, answers, titles = load_qa_pairs(args.dev_path, args)
+    pbar = tqdm(get_top_phrases(
+            mips, q_ids, questions, answers, titles, target_encoder, tokenizer,
+            args.eval_batch_size, args, is_eval=True)
+        )
+    top_k_boolean = []
+    for step_idx, (q_ids, questions, answers, titles, outs) in enumerate(pbar):
+        top_k_boolean += [
+            [any(answer in phrase['context'] for answer in answer_set) for phrase in phrase_group]
+            for phrase_group, answer_set in zip(outs, answers)
+        ]
+    top_k_acc = [sum(i)/(args.dev_top_k*2) for i in top_k_boolean]
+    top_1_acc = [i[0] for i in top_k_boolean]
+    return sum(top_1_acc)/len(top_1_acc), sum(top_k_acc)/len(top_k_acc) 
 
 def save_model(args, global_step, metric, model):
     if args.eval_psg:
@@ -212,7 +220,7 @@ def save_model(args, global_step, metric, model):
 
 
     # modifyable
-def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, tokenizer, batch_size, args):
+def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, tokenizer, batch_size, args, is_eval=False):
     # Search
     step = batch_size
     phrase_idxs = []
@@ -233,8 +241,9 @@ def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, toke
         outs = search_fn(
             query_vec,
             q_texts=questions[q_idx:q_idx+step], nprobe=args.nprobe,
-            top_k=args.top_k, return_idxs=True,
-            max_answer_length=args.max_answer_length, aggregate=args.aggregate, agg_strat=args.agg_strat,
+            top_k=args.dev_top_k if is_eval else args.top_k,
+            return_idxs=True, max_answer_length=args.max_answer_length,
+            aggregate=args.aggregate, agg_strat=args.agg_strat,
             return_sent = True if args.label_strat == "sent" else False
         )
         yield (
