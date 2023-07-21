@@ -186,7 +186,7 @@ def train_query_encoder(args, mips=None):
                     dev_top_1_acc, dev_top_k_acc, dev_top_k_recall = dev_eval(args, mips, target_encoder, tokenizer)
                     logger.info(f"Develoment set dev_acc@1: {dev_top_1_acc:.3f}, dev_acc@{args.dev_top_k}: {dev_top_k_acc:.3f}, dev_recall@{args.dev_top_k}: {dev_top_k_recall:.3f}")
                     wandb.log( 
-                            {"dev_acc@1": dev_top_1_acc, "dev_acc@{args.dev_top_k}": dev_top_k_acc, "dev_recall@{args.dev_top_k}": dev_top_k_recall} , step=global_step,)
+                            {"dev_acc@1": dev_top_1_acc, f"dev_acc@{args.dev_top_k}": dev_top_k_acc, f"dev_recall@{args.dev_top_k}": dev_top_k_recall} , step=global_step,)
     last_steps = global_step % args.save_steps
     if not last_steps:
         last_steps = args.save_steps
