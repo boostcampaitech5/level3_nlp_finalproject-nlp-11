@@ -59,10 +59,10 @@ train-query: dump-dir model-name nq-open-data large-index
 		--run_mode train_query \
 		--cache_dir $(CACHE_DIR) \
 		--train_path $(DATA_DIR)/$(TRAIN_DATA) \
-		--per_gpu_train_batch_size 128 \
+		--per_gpu_train_batch_size 12 \
 		--dev_path $(DATA_DIR)/$(DEV_DATA) \
 		--test_path $(DATA_DIR)/$(TEST_DATA) \
-		--eval_batch_size 128 \
+		--eval_batch_size 12 \
 		--learning_rate 3e-5 \
 		--num_train_epochs 3 \
 		--dump_dir $(DUMP_DIR) \
@@ -73,7 +73,8 @@ train-query: dump-dir model-name nq-open-data large-index
 		--cuda \
 		--label_strat phrase \
 		--wandb \
-		--save_steps 300 \
+		--save_steps 3299 \
+		--eval_steps 3299 \
 		--project $(PROJECT_NAME) \
 		--entity $(ENTITY_NAME) \
 		--run_name $(RUN_NAME) \
