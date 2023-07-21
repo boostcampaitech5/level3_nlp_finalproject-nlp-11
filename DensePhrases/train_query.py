@@ -226,6 +226,9 @@ def save_model(args, global_step, metric, model):
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     model.save_pretrained(save_path)
+    metric_save_path = os.path.join(save_path, "metric.json")
+    with open(metric_save_path, "w") as f:
+        json.dump(metric, f)
     logger.info(f"Saved best model at step {global_step} into {save_path}")
 
 
