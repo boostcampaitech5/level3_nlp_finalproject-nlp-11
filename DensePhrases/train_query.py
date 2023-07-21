@@ -205,6 +205,8 @@ def train_query_encoder(args, mips=None):
     logger.info(f"Best model has metric {metric:.3f} saved into {args.output_dir}")
 
 def dev_eval(args, mips, target_encoder, tokenizer):
+    is_sent = args.return_sent
+    args.return_sent = True
     q_ids, questions, answers, titles = load_qa_pairs(args.dev_path, args)
     pbar = tqdm(get_top_phrases(
             mips, q_ids, questions, answers, titles, target_encoder, tokenizer,
@@ -219,6 +221,7 @@ def dev_eval(args, mips, target_encoder, tokenizer):
     top_k_recall = [sum(i)/(args.dev_top_k*2) for i in top_k_boolean]
     top_k_acc = [any(i) for i in top_k_boolean]
     top_1_acc = [i[0] for i in top_k_boolean]
+    args.return_sent = is_sent
     return sum(top_1_acc)/len(top_1_acc), sum(top_k_acc)/len(top_k_acc), sum(top_k_recall)/len(top_k_recall)
 
 def save_model(args, global_step, metric, model):
