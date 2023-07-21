@@ -82,13 +82,14 @@ def train_query_encoder(args, mips=None):
     # Train arguments
     args.per_gpu_train_batch_size = int(args.per_gpu_train_batch_size / args.gradient_accumulation_steps)
     global_step = 0
-    if args.eval_psg:
-        # TODO: add psg metric
-        # loss
-        metric = 1e9
-    else:
-        # best_acc
-        metric = -1000.0
+    metric = {
+        "train_loss":1e9,
+        "train_acc@1":-1000.0,
+        "train_acc@k":-1000.0,
+        "dev_acc@1":-1000.0,
+        "dev_acc@k":-1000.0,
+        "dev_recall@k":-1000.0
+    }
 
     # Training
     total_loss = 0.0
@@ -151,7 +152,7 @@ def train_query_encoder(args, mips=None):
                         f"Ep {ep_idx+1} Tr loss: {loss.mean().item():.2f}, acc: {sum(accs)/len(accs):.3f}"
                     )
                 wandb.log( 
-                          {"train_loss": loss.mean().item(), "train_acc@1_step": sum(accs)/len(accs), "learning_rate":optimizer.param_groups[0]['lr']} , step=global_step,)
+                          {"train_loss": loss.mean().item(), "train_acc@1(step)": sum(accs)/len(accs), "learning_rate":optimizer.param_groups[0]['lr']} , step=global_step,)
 
 
                 if accs is not None:
@@ -164,19 +165,17 @@ def train_query_encoder(args, mips=None):
                 global_step += 1
                 # Save best model
                 if args.save_steps and not global_step % args.save_steps:
-                    if args.eval_psg:
-                        metric = total_loss/args.save_steps
-                        save_model(args, global_step, metric, target_encoder)
-                    else:
-                        metric = sum(total_accs_k)/len(total_accs_k)
-                        save_model(args, global_step, metric, target_encoder)
+                    metric["train_loss"] = total_loss/args.save_steps
+                    metric["train_acc@1"] = sum(total_accs)/len(total_accs)
+                    metric["train_acc@k"] = sum(total_accs_k)/len(total_accs_k)
+                    save_model(args, global_step, metric, target_encoder)
 
                     logger.info(
                         f"Avg train loss ({global_step} iterations): {total_loss/args.save_steps:.2f} | train " +
                         f"train_acc@1: {sum(total_accs)/len(total_accs):.3f} | train_acc@{args.top_k}: {sum(total_accs_k)/len(total_accs_k):.3f}"
                     )
                     wandb.log( 
-                          {"train_acc@1": sum(total_accs)/len(total_accs), f"train_acc@{args.top_k}": sum(total_accs_k)/len(total_accs_k), "train_loss_avg":total_loss/args.save_steps} , step=global_step,)
+                          {"train_acc@1(avg)": sum(total_accs)/len(total_accs), f"train_acc@{args.top_k}": sum(total_accs_k)/len(total_accs_k), "train_loss_avg":total_loss/args.save_steps} , step=global_step,)
                     total_loss = 0.0
                     total_accs = []
                     total_accs_k = []
@@ -184,18 +183,19 @@ def train_query_encoder(args, mips=None):
                 if args.eval_steps and not global_step % args.eval_steps:
                     # Evaluation
                     dev_top_1_acc, dev_top_k_acc, dev_top_k_recall = dev_eval(args, mips, target_encoder, tokenizer)
+                    metric["dev_acc@1"] = dev_top_1_acc
+                    metric["dev_acc@k"] = dev_top_k_acc
+                    metric["dev_recall@k"] = dev_top_k_recall
                     logger.info(f"Develoment set dev_acc@1: {dev_top_1_acc:.3f}, dev_acc@{args.dev_top_k}: {dev_top_k_acc:.3f}, dev_recall@{args.dev_top_k}: {dev_top_k_recall:.3f}")
                     wandb.log( 
                             {"dev_acc@1": dev_top_1_acc, f"dev_acc@{args.dev_top_k}": dev_top_k_acc, f"dev_recall@{args.dev_top_k}": dev_top_k_recall} , step=global_step,)
     last_steps = global_step % args.save_steps
     if not last_steps:
         last_steps = args.save_steps
-    if args.eval_psg:
-        metric = total_loss/last_steps
-        save_model(args, global_step, metric, target_encoder)
-    else:
-        metric = sum(total_accs_k)/len(total_accs_k)
-        save_model(args, global_step, metric, target_encoder)
+    metric["train_loss"] = total_loss/last_steps
+    metric["train_acc@1"] = sum(total_accs)/len(total_accs)
+    metric["train_acc@k"] = sum(total_accs_k)/len(total_accs_k)
+    save_model(args, global_step, metric, target_encoder)
     logger.info(
         f"Avg train loss ({global_step} iterations): {total_loss/last_steps:.2f} | train " +
         f"train_acc@1: {sum(total_accs)/len(total_accs):.3f} | train_acc@{args.top_k}: {sum(total_accs_k)/len(total_accs_k):.3f}"
@@ -222,15 +222,11 @@ def dev_eval(args, mips, target_encoder, tokenizer):
     return sum(top_1_acc)/len(top_1_acc), sum(top_k_acc)/len(top_k_acc), sum(top_k_recall)/len(top_k_recall)
 
 def save_model(args, global_step, metric, model):
-    if args.eval_psg:
-        m = "loss"
-    else:
-        m = "acc"
-    save_path = os.path.join(args.output_dir, f"step_{global_step}_metric_{metric:.2f}")
+    save_path = os.path.join(args.output_dir, f"step_{global_step}")
     if not os.path.exists(save_path):
         os.makedirs(save_path)
     model.save_pretrained(save_path)
-    logger.info(f"Saved best model with metric {m} {metric:.3f} into {save_path}")
+    logger.info(f"Saved best model at step {global_step} into {save_path}")
 
 
     # modifyable
