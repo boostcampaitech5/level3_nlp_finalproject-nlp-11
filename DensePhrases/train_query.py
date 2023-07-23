@@ -261,7 +261,7 @@ def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, toke
             top_k=args.dev_top_k if is_eval else args.top_k,
             return_idxs=True, max_answer_length=args.max_answer_length,
             aggregate=args.aggregate, agg_strat=args.agg_strat,
-            return_sent = True if args.label_strat == "sent" else False
+            return_sent = args.return_sent
         )
         yield (
             q_ids[q_idx:q_idx+step], questions[q_idx:q_idx+step], answers[q_idx:q_idx+step],
