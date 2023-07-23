@@ -34,7 +34,9 @@ logger = logging.getLogger(__name__)
 
 
 def train_query_encoder(args, mips=None):
-    # TODO: log to wandb
+    # assert sent option is correct
+    assert (args.label_strat == "sent") == args.return_sent, "return_sent argument must match with label_strat 'sent'"
+
     # Freeze one for MIPS
     device = 'cuda' if args.cuda else 'cpu'
     logger.info("Loading pretrained encoder: this one is for MIPS (fixed)")
