@@ -51,10 +51,20 @@ dummy-data:
 	$(eval DEV_DATA=open-qa/nq-open/dummy.json)
 	$(eval TEST_DATA=open-qa/nq-open/dummy.json)
 	$(eval OPTIONS=--truecase)
+nq-open-data-gpt:
+	$(eval TRAIN_DATA=open-qa/nq-open/train_preprocessed_changed_with_gpt.json)
+	$(eval DEV_DATA=open-qa/nq-open/dev_preprocessed_changed_with_gpt.json)
+	$(eval TEST_DATA=open-qa/nq-open/test_preprocessed_changed_with_gpt.json)
+	$(eval OPTIONS=--truecase)
+nq-open-data-t5:
+	$(eval TRAIN_DATA=open-qa/nq-open/train_preprocessed_changed_with_gpt.json)
+	$(eval DEV_DATA=open-qa/nq-open/dev_preprocessed_changed_with_gpt.json)
+	$(eval TEST_DATA=open-qa/nq-open/test_preprocessed_changed_with_t5_base.json)
+	$(eval OPTIONS=--truecase)
 
 
 # Query-side fine-tuning
-train-query: dump-dir model-name nq-open-data large-index
+train-query: dump-dir model-name $(DATA_NAME) large-index
 	python $(BASE_DIR)/train_query.py \
 		--run_mode train_query \
 		--cache_dir $(CACHE_DIR) \
@@ -71,7 +81,7 @@ train-query: dump-dir model-name nq-open-data large-index
 		--output_dir $(SAVE_DIR)/$(MODEL_NAME) \
 		--top_k 100 \
 		--cuda \
-		--label_strat phrase \
+		--label_strat "sent,psg" \
 		--wandb \
 		--save_steps 3299 \
 		--eval_steps 3299 \

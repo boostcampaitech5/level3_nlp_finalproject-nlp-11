@@ -34,7 +34,9 @@ logger = logging.getLogger(__name__)
 
 
 def train_query_encoder(args, mips=None):
-    # TODO: log to wandb
+    # assert sent option is correct
+    assert (args.label_strat == "sent") == args.return_sent, "return_sent argument must match with label_strat 'sent'"
+
     # Freeze one for MIPS
     device = 'cuda' if args.cuda else 'cpu'
     logger.info("Loading pretrained encoder: this one is for MIPS (fixed)")
@@ -151,8 +153,8 @@ def train_query_encoder(args, mips=None):
                     pbar.set_description(
                         f"Ep {ep_idx+1} Tr loss: {loss.mean().item():.2f}, acc: {sum(accs)/len(accs):.3f}"
                     )
-                wandb.log( 
-                          {"train_loss": loss.mean().item(), "train_acc@1(step)": sum(accs)/len(accs), "learning_rate":optimizer.param_groups[0]['lr']} , step=global_step,)
+                    wandb.log( 
+                            {"train_loss": loss.mean().item(), "train_acc@1(step)": sum(accs)/len(accs), "learning_rate":optimizer.param_groups[0]['lr']} , step=global_step,)
 
 
                 if accs is not None:
@@ -190,19 +192,18 @@ def train_query_encoder(args, mips=None):
                     wandb.log( 
                             {"dev_acc@1": dev_top_1_acc, f"dev_acc@{args.dev_top_k}": dev_top_k_acc, f"dev_recall@{args.dev_top_k}": dev_top_k_recall} , step=global_step,)
     last_steps = global_step % args.save_steps
-    if not last_steps:
-        last_steps = args.save_steps
-    metric["train_loss"] = total_loss/last_steps
-    metric["train_acc@1"] = sum(total_accs)/len(total_accs)
-    metric["train_acc@k"] = sum(total_accs_k)/len(total_accs_k)
-    save_model(args, global_step, metric, target_encoder)
-    logger.info(
-        f"Avg train loss ({global_step} iterations): {total_loss/last_steps:.2f} | train " +
-        f"train_acc@1: {sum(total_accs)/len(total_accs):.3f} | train_acc@{args.top_k}: {sum(total_accs_k)/len(total_accs_k):.3f}"
-    )
-    wandb.log( 
-            {"train_acc@1": sum(total_accs)/len(total_accs), f"train_acc@{args.top_k}": sum(total_accs_k)/len(total_accs_k), "train_loss_avg":total_loss/last_steps} , step=global_step,)
-    logger.info(f"Best model has metric {metric:.3f} saved into {args.output_dir}")
+    if last_steps:
+        metric["train_loss"] = total_loss/last_steps
+        metric["train_acc@1"] = sum(total_accs)/len(total_accs)
+        metric["train_acc@k"] = sum(total_accs_k)/len(total_accs_k)
+        save_model(args, global_step, metric, target_encoder)
+        logger.info(
+            f"Avg train loss ({global_step} iterations): {total_loss/last_steps:.2f} | train " +
+            f"train_acc@1: {sum(total_accs)/len(total_accs):.3f} | train_acc@{args.top_k}: {sum(total_accs_k)/len(total_accs_k):.3f}"
+        )
+        wandb.log( 
+                {"train_acc@1": sum(total_accs)/len(total_accs), f"train_acc@{args.top_k}": sum(total_accs_k)/len(total_accs_k), "train_loss_avg":total_loss/last_steps} , step=global_step,)
+    logger.info(f"model saved into {args.output_dir}")
 
 def dev_eval(args, mips, target_encoder, tokenizer):
     is_sent = args.return_sent
@@ -260,7 +261,7 @@ def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, toke
             top_k=args.dev_top_k if is_eval else args.top_k,
             return_idxs=True, max_answer_length=args.max_answer_length,
             aggregate=args.aggregate, agg_strat=args.agg_strat,
-            return_sent = True if args.label_strat == "sent" else False
+            return_sent = args.return_sent
         )
         yield (
             q_ids[q_idx:q_idx+step], questions[q_idx:q_idx+step], answers[q_idx:q_idx+step],

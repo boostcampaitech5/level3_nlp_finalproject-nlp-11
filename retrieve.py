@@ -29,7 +29,8 @@ class Retriever():
         self.model = DensePhrases(
             load_dir=self.args.query_encoder_name_or_dir, # change query encoder after re-training
             dump_dir=DUMP_DIR,
-            index_name=self.args.index_name
+            index_name=self.args.index_name,
+            verbose=True,
         )
 
     def retrieve(self, single_query_or_queries_dict):
@@ -83,6 +84,8 @@ if __name__ == "__main__":
                         help="output runfile name which indluces query id and retrieved collection")
     parser.add_argument('--batch_size', type=int, default=1,
                         help="#query to process with parallel processing")
+    parser.add_argument('--verbose', type=bool, default=True,
+                        help="logger level setting - true: info, false: warning")
     
     args = parser.parse_args()
     

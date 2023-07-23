@@ -81,6 +81,10 @@ def eval(args):
     mAR = sum(recall_by_collection_len) / len(recall_by_collection_len)
     print(f"mean average recall = {mAR}")
 
+    if len(recall_by_collection_len) >= 30:
+        mAR_3000 = sum(recall_by_collection_len[:30]) / 30
+        print(f"mean average recall 3000 words = {mAR_3000}")
+
 
 if __name__ == "__main__":
     # parse arguments
