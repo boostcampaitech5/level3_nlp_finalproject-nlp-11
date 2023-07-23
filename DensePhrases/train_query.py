@@ -90,7 +90,7 @@ def train_query_encoder(args, mips=None):
         "train_acc@k":-1000.0,
         "dev_acc@1":-1000.0,
         "dev_acc@k":-1000.0,
-        "dev_recall@k":-1000.0
+        "dev_precision@k":-1000.0
     }
 
     # Training
@@ -184,13 +184,13 @@ def train_query_encoder(args, mips=None):
                 
                 if args.eval_steps and not global_step % args.eval_steps:
                     # Evaluation
-                    dev_top_1_acc, dev_top_k_acc, dev_top_k_recall = dev_eval(args, mips, target_encoder, tokenizer)
+                    dev_top_1_acc, dev_top_k_acc, dev_top_k_precision = dev_eval(args, mips, target_encoder, tokenizer)
                     metric["dev_acc@1"] = dev_top_1_acc
                     metric["dev_acc@k"] = dev_top_k_acc
                     metric["dev_recall@k"] = dev_top_k_recall
-                    logger.info(f"Develoment set dev_acc@1: {dev_top_1_acc:.3f}, dev_acc@{args.dev_top_k}: {dev_top_k_acc:.3f}, dev_recall@{args.dev_top_k}: {dev_top_k_recall:.3f}")
+                    logger.info(f"Develoment set dev_acc@1: {dev_top_1_acc:.3f}, dev_acc@{args.dev_top_k}: {dev_top_k_acc:.3f}, dev_precision@{args.dev_top_k}: {dev_top_k_precision:.3f}")
                     wandb.log( 
-                            {"dev_acc@1": dev_top_1_acc, f"dev_acc@{args.dev_top_k}": dev_top_k_acc, f"dev_recall@{args.dev_top_k}": dev_top_k_recall} , step=global_step,)
+                            {"dev_acc@1": dev_top_1_acc, f"dev_acc@{args.dev_top_k}": dev_top_k_acc, f"dev_precision@{args.dev_top_k}": dev_top_k_precision} , step=global_step,)
     last_steps = global_step % args.save_steps
     if last_steps:
         metric["train_loss"] = total_loss/last_steps
@@ -219,11 +219,11 @@ def dev_eval(args, mips, target_encoder, tokenizer):
             [any(answer in phrase['context'] for answer in answer_set) for phrase in phrase_group]
             for phrase_group, answer_set in zip(outs, answers)
         ]
-    top_k_recall = [sum(i)/(args.dev_top_k*2) for i in top_k_boolean]
+    top_k_precision = [sum(i)/(args.dev_top_k*2) for i in top_k_boolean]
     top_k_acc = [any(i) for i in top_k_boolean]
     top_1_acc = [i[0] for i in top_k_boolean]
     args.return_sent = is_sent
-    return sum(top_1_acc)/len(top_1_acc), sum(top_k_acc)/len(top_k_acc), sum(top_k_recall)/len(top_k_recall)
+    return sum(top_1_acc)/len(top_1_acc), sum(top_k_acc)/len(top_k_acc), sum(top_k_precision)/len(top_k_precision)
 
 def save_model(args, global_step, metric, model):
     save_path = os.path.join(args.output_dir, f"step_{global_step}")
