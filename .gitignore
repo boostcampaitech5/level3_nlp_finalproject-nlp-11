@@ -6,3 +6,5 @@
 **/runs/
 **/princeton-nlp/
 **/wandb/
+**/t5_dataset/
+**/t5-large-1/
