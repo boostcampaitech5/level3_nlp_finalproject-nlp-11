@@ -21,6 +21,7 @@ TEMPERATURE = 0
 
 
 class LangChainCustomRetrieverWrapper(BaseRetriever):
+
     def __init__(self, args):
         self.args = args
 
@@ -42,18 +43,14 @@ class LangChainCustomRetrieverWrapper(BaseRetriever):
         results = self.retriever.retrieve(single_query_or_queries_dict=query)
 
         # make result list of Document object
-        return [
-            Document(page_content=result, metadata={"source": f"source_{idx}"})
-            for idx, result in enumerate(results)
-        ]
+        return [Document(page_content=result, metadata={"source": f"source_{idx}"}) for idx, result in enumerate(results)]
 
-    async def aget_relevant_documents(
-        self, query: str
-    ) -> List[Document]:  # abstractmethod
+    async def aget_relevant_documents(self, query: str) -> List[Document]:  # abstractmethod
         raise NotImplementedError
 
 
 class RaLM:
+
     def __init__(self, args):
         self.args = args
         self.initialize_ralm()
@@ -120,12 +117,7 @@ class RaLM:
 
     def postprocess(self, text):
         # remove final parenthesis (bug with unknown cause)
-        if (
-            text.endswith(")")
-            or text.endswith("(")
-            or text.endswith("[")
-            or text.endswith("]")
-        ):
+        if (text.endswith(")") or text.endswith("(") or text.endswith("[") or text.endswith("]")):
             text = text[:-1]
 
         return text.strip()
@@ -167,14 +159,8 @@ if __name__ == "__main__":
     def question_answer(question):
         result = app.run_chain(question=question, force_korean=False)
 
-        return result[
-            "answer"
-        ], "\n######################################################\n\n".join(
-            [
-                f"Source {idx}\n{doc.page_content}"
-                for idx, doc in enumerate(result["source_documents"])
-            ]
-        )
+        return result["answer"], "\n######################################################\n\n".join(
+            [f"Source {idx}\n{doc.page_content}" for idx, doc in enumerate(result["source_documents"])])
 
     # launch gradio
     gr.Interface(
@@ -182,11 +168,10 @@ if __name__ == "__main__":
         inputs=gr.inputs.Textbox(default=DEFAULT_QUESTION, label="질문"),
         outputs=[
             gr.inputs.Textbox(default="챗봇의 답변을 표시합니다.", label="생성된 답변"),
-            gr.inputs.Textbox(
-                default="prompt에 사용된 검색 결과들을 표시합니다.", label="prompt에 첨부된 검색 결과들"
-            ),
+            gr.inputs.Textbox(default="prompt에 사용된 검색 결과들을 표시합니다.", label="prompt에 첨부된 검색 결과들"),
         ],
         title="지식기반 챗봇",
         theme="dark-grass",
-        description="사용자의 지식베이스에 기반해서 대화하는 챗봇입니다.\n본 예시에서는 wikipedia dump에서 검색한 후 이를 바탕으로 답변을 생성합니다.\n\n retriever: densePhrase, generator: gpt-3.5-turbo-16k-0613 (API)",
+        description=
+        "사용자의 지식베이스에 기반해서 대화하는 챗봇입니다.\n본 예시에서는 wikipedia dump에서 검색한 후 이를 바탕으로 답변을 생성합니다.\n\n retriever: densePhrase, generator: gpt-3.5-turbo-16k-0613 (API)",
     ).launch(share=True)
