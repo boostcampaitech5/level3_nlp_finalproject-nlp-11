@@ -61,6 +61,11 @@ nq-open-data-t5:
 	$(eval DEV_DATA=open-qa/nq-open/dev_preprocessed_changed_with_gpt.json)
 	$(eval TEST_DATA=open-qa/nq-open/test_preprocessed_changed_with_t5_base.json)
 	$(eval OPTIONS=--truecase)
+nq-open-data-with-context:
+	$(eval TRAIN_DATA=open-qa/nq-open/train_wiki3_preprocessed.json)
+	$(eval DEV_DATA=open-qa/nq-open/dev_preprocessed.json)
+	$(eval TEST_DATA=open-qa/nq-open/test_preprocessed.json)
+	$(eval OPTIONS=--truecase)
 
 
 # Query-side fine-tuning
@@ -81,7 +86,7 @@ train-query: dump-dir model-name $(DATA_NAME) large-index
 		--output_dir $(SAVE_DIR)/$(MODEL_NAME) \
 		--top_k 100 \
 		--cuda \
-		--label_strat "sent,psg" \
+		--label_strat "phrase,psg" \
 		--wandb \
 		--save_steps 3299 \
 		--eval_steps 3299 \
