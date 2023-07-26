@@ -6,10 +6,10 @@ import logging
 from tqdm import tqdm
 
 from densephrases import DensePhrases # note that DensePhrases is installed with editable mode
-
+from question_chaged_with_T5 import changed_with_t5
 # fixed setting
 R_UNIT='sentence'
-TOP_K=200
+TOP_K=5
 DUMP_DIR='DensePhrases/outputs/densephrases-multi_wiki-20181220/dump'
 RUNFILE_DIR="runs"
 os.makedirs(RUNFILE_DIR, exist_ok=True)
@@ -62,7 +62,8 @@ class Retriever():
             return None
                             
         elif isinstance(single_query_or_queries_dict, str): # online search
-            result = self.model.search(single_query_or_queries_dict, retrieval_unit=R_UNIT, top_k=TOP_K)
+            changed_query = changed_with_t5(single_query_or_queries_dict)
+            result = self.model.search(changed_query, retrieval_unit=R_UNIT, top_k=TOP_K)
 
             return result
         else:

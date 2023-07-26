@@ -8,3 +8,7 @@
 **/wandb/
 **/t5_dataset/
 **/t5-large-1/
+**/t5_paraphrase/
+**/t5_reparaphrase/
+**/paraphrase_data/
+**/lightning_logs/
