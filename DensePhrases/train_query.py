@@ -202,7 +202,7 @@ def train_query_encoder(args, mips=None):
             f"train_acc@1: {sum(total_accs)/len(total_accs):.3f} | train_acc@{args.top_k}: {sum(total_accs_k)/len(total_accs_k):.3f}"
         )
         wandb.log( 
-                {"train_acc@1": sum(total_accs)/len(total_accs), f"train_acc@{args.top_k}": sum(total_accs_k)/len(total_accs_k), "train_loss_avg":total_loss/last_steps} , step=global_step,)
+                {"train_acc@1(avg)": sum(total_accs)/len(total_accs), f"train_acc@{args.top_k}": sum(total_accs_k)/len(total_accs_k), "train_loss_avg":total_loss/last_steps} , step=global_step,)
     logger.info(f"model saved into {args.output_dir}")
 
 def dev_eval(args, mips, target_encoder, tokenizer):
@@ -337,8 +337,8 @@ def annotate_phrase_vecs(mips, q_ids, questions, answers, titles, contexts, phra
     # Annotate for L_psg
     if 'psg' in args.label_strat.split(','):
         p_targets = [
-            [context[1:] in phrase['context'] for phrase in phrase_group]
-            for phrase_group, context in zip(phrase_groups, contexts)
+            [any(answer in phrase['context'] for answer in answer_set) for phrase in phrase_group]
+            for phrase_group, answer_set in zip(phrase_groups, answers)
         ]
         p_targets = [[ii if val else None for ii, val in enumerate(target)] for target in p_targets]
 
