@@ -6,10 +6,10 @@ import logging
 from tqdm import tqdm
 
 from densephrases import DensePhrases # note that DensePhrases is installed with editable mode
-from question_chaged_with_T5 import changed_with_t5
+from question_chaged_with_T5 import T5_model
 # fixed setting
 R_UNIT='sentence'
-TOP_K=5
+TOP_K=200
 DUMP_DIR='DensePhrases/outputs/densephrases-multi_wiki-20181220/dump'
 RUNFILE_DIR="runs"
 os.makedirs(RUNFILE_DIR, exist_ok=True)
@@ -23,7 +23,7 @@ class Retriever():
     def __init__(self, args):
         self.args = args
         self.initialize_retriever()
-    
+        self.initialize_t5()
     def initialize_retriever(self):
         # load model
         self.model = DensePhrases(
@@ -32,7 +32,9 @@ class Retriever():
             index_name=self.args.index_name,
             verbose=True,
         )
-
+    def initialize_t5(self):
+        #load T5
+        self.model_t5 = T5_model()
     def retrieve(self, single_query_or_queries_dict):
         queries_batch = []
         if isinstance(single_query_or_queries_dict, dict): # batch search
@@ -62,7 +64,7 @@ class Retriever():
             return None
                             
         elif isinstance(single_query_or_queries_dict, str): # online search
-            changed_query = changed_with_t5(single_query_or_queries_dict)
+            changed_query = self.model_t5.changed_with_t5(single_query_or_queries_dict)
             result = self.model.search(changed_query, retrieval_unit=R_UNIT, top_k=TOP_K)
 
             return result
@@ -77,7 +79,7 @@ if __name__ == "__main__":
                         help="query encoder name registered in huggingface model hub OR custom query encoder checkpoint directory")
     parser.add_argument('--index_name', type=str, default="start/1048576_flat_OPQ96",
                         help="index name appended to index directory prefix")
-    parser.add_argument('--query_list_path', type=str, default="DensePhrases/densephrases-data/open-qa/nq-open/test_preprocessed.json",
+    parser.add_argument('--query_list_path', type=str, default="DensePhrases/densephrases-data/open-qa/nq-open/test_preprocessed_changed_with_t5_base_2.json",
                         help="use batch search by default")    
     parser.add_argument('--single_query', type=str, default=None,
                         help="if presented do online search instead of batch search")

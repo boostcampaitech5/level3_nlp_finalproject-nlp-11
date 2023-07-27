@@ -75,7 +75,7 @@ def eval(args):
 
     recall_by_collection_len = np.mean(recall_by_collection_len_per_sample, axis=0)
 
-    print(recall_by_collection_len)
+    print(recall_by_collection_len.tolist())
 
     # get mean average reacall (mAR)
     mAR = sum(recall_by_collection_len) / len(recall_by_collection_len)
