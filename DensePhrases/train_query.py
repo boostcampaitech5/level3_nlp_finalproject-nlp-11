@@ -90,7 +90,7 @@ def train_query_encoder(args, mips=None):
         "train_acc@k":-1000.0,
         "dev_acc@1":-1000.0,
         "dev_acc@k":-1000.0,
-        "dev_recall@k":-1000.0
+        "dev_precision@k":-1000.0
     }
 
     # Training
@@ -100,17 +100,17 @@ def train_query_encoder(args, mips=None):
 
     for ep_idx in range(int(args.num_train_epochs)):
         # Load training dataset
-        q_ids, questions, answers, titles = load_qa_pairs(args.train_path, args, shuffle=True)
+        q_ids, questions, answers, titles, contexts = load_qa_pairs(args.train_path, args, shuffle=True)
         pbar = tqdm(get_top_phrases(
-            mips, q_ids, questions, answers, titles, target_encoder, tokenizer,
+            mips, q_ids, questions, answers, titles, contexts, target_encoder, tokenizer,
             args.per_gpu_train_batch_size, args)
         )
 
-        for step_idx, (q_ids, questions, answers, titles, outs) in enumerate(pbar):
+        for step_idx, (q_ids, questions, answers, titles, contexts, outs) in enumerate(pbar):
             train_dataloader, _, _ = get_question_dataloader(
                 questions, tokenizer, args.max_query_length, batch_size=args.per_gpu_train_batch_size
             )
-            svs, evs, tgts, p_tgts = annotate_phrase_vecs(mips, q_ids, questions, answers, titles, outs, args)
+            svs, evs, tgts, p_tgts = annotate_phrase_vecs(mips, q_ids, questions, answers, titles, contexts, outs, args)
 
             target_encoder.train()
             svs_t = torch.Tensor(svs).to(device)
@@ -184,13 +184,13 @@ def train_query_encoder(args, mips=None):
                 
                 if args.eval_steps and not global_step % args.eval_steps:
                     # Evaluation
-                    dev_top_1_acc, dev_top_k_acc, dev_top_k_recall = dev_eval(args, mips, target_encoder, tokenizer)
+                    dev_top_1_acc, dev_top_k_acc, dev_top_k_precision = dev_eval(args, mips, target_encoder, tokenizer)
                     metric["dev_acc@1"] = dev_top_1_acc
                     metric["dev_acc@k"] = dev_top_k_acc
-                    metric["dev_recall@k"] = dev_top_k_recall
-                    logger.info(f"Develoment set dev_acc@1: {dev_top_1_acc:.3f}, dev_acc@{args.dev_top_k}: {dev_top_k_acc:.3f}, dev_recall@{args.dev_top_k}: {dev_top_k_recall:.3f}")
+                    metric["dev_precision@k"] = dev_top_k_precision
+                    logger.info(f"Develoment set dev_acc@1: {dev_top_1_acc:.3f}, dev_acc@{args.dev_top_k}: {dev_top_k_acc:.3f}, dev_precision@{args.dev_top_k}: {dev_top_k_precision:.3f}")
                     wandb.log( 
-                            {"dev_acc@1": dev_top_1_acc, f"dev_acc@{args.dev_top_k}": dev_top_k_acc, f"dev_recall@{args.dev_top_k}": dev_top_k_recall} , step=global_step,)
+                            {"dev_acc@1": dev_top_1_acc, f"dev_acc@{args.dev_top_k}": dev_top_k_acc, f"dev_precision@{args.dev_top_k}": dev_top_k_precision} , step=global_step,)
     last_steps = global_step % args.save_steps
     if last_steps:
         metric["train_loss"] = total_loss/last_steps
@@ -202,28 +202,28 @@ def train_query_encoder(args, mips=None):
             f"train_acc@1: {sum(total_accs)/len(total_accs):.3f} | train_acc@{args.top_k}: {sum(total_accs_k)/len(total_accs_k):.3f}"
         )
         wandb.log( 
-                {"train_acc@1": sum(total_accs)/len(total_accs), f"train_acc@{args.top_k}": sum(total_accs_k)/len(total_accs_k), "train_loss_avg":total_loss/last_steps} , step=global_step,)
+                {"train_acc@1(avg)": sum(total_accs)/len(total_accs), f"train_acc@{args.top_k}": sum(total_accs_k)/len(total_accs_k), "train_loss_avg":total_loss/last_steps} , step=global_step,)
     logger.info(f"model saved into {args.output_dir}")
 
 def dev_eval(args, mips, target_encoder, tokenizer):
     is_sent = args.return_sent
     args.return_sent = True
-    q_ids, questions, answers, titles = load_qa_pairs(args.dev_path, args)
+    q_ids, questions, answers, titles, contexts = load_qa_pairs(args.dev_path, args)
     pbar = tqdm(get_top_phrases(
-            mips, q_ids, questions, answers, titles, target_encoder, tokenizer,
+            mips, q_ids, questions, answers, titles, contexts, target_encoder, tokenizer,
             args.eval_batch_size, args, is_eval=True)
         )
     top_k_boolean = []
-    for step_idx, (q_ids, questions, answers, titles, outs) in enumerate(pbar):
+    for step_idx, (q_ids, questions, answers, titles, contexts, outs) in enumerate(pbar):
         top_k_boolean += [
             [any(answer in phrase['context'] for answer in answer_set) for phrase in phrase_group]
             for phrase_group, answer_set in zip(outs, answers)
         ]
-    top_k_recall = [sum(i)/(args.dev_top_k*2) for i in top_k_boolean]
+    top_k_precision = [sum(i)/(args.dev_top_k*2) for i in top_k_boolean]
     top_k_acc = [any(i) for i in top_k_boolean]
     top_1_acc = [i[0] for i in top_k_boolean]
     args.return_sent = is_sent
-    return sum(top_1_acc)/len(top_1_acc), sum(top_k_acc)/len(top_k_acc), sum(top_k_recall)/len(top_k_recall)
+    return sum(top_1_acc)/len(top_1_acc), sum(top_k_acc)/len(top_k_acc), sum(top_k_precision)/len(top_k_precision)
 
 def save_model(args, global_step, metric, model):
     save_path = os.path.join(args.output_dir, f"step_{global_step}")
@@ -237,7 +237,7 @@ def save_model(args, global_step, metric, model):
 
 
     # modifyable
-def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, tokenizer, batch_size, args, is_eval=False):
+def get_top_phrases(mips, q_ids, questions, answers, titles, contexts, query_encoder, tokenizer, batch_size, args, is_eval=False):
     # Search
     step = batch_size
     phrase_idxs = []
@@ -265,11 +265,11 @@ def get_top_phrases(mips, q_ids, questions, answers, titles, query_encoder, toke
         )
         yield (
             q_ids[q_idx:q_idx+step], questions[q_idx:q_idx+step], answers[q_idx:q_idx+step],
-            titles[q_idx:q_idx+step], outs
+            titles[q_idx:q_idx+step], contexts[q_idx:q_idx+step], outs
         )
 
     # modifyable
-def annotate_phrase_vecs(mips, q_ids, questions, answers, titles, phrase_groups, args):
+def annotate_phrase_vecs(mips, q_ids, questions, answers, titles, contexts, phrase_groups, args):
     assert mips is not None
     batch_size = len(answers)
 
@@ -334,11 +334,11 @@ def annotate_phrase_vecs(mips, q_ids, questions, answers, titles, phrase_groups,
         ]
         targets = [[ii if val else None for ii, val in enumerate(target)] for target in targets]
 
-    # Annotate for L_doc
-    if 'doc' in args.label_strat.split(','):
+    # Annotate for L_psg
+    if 'psg' in args.label_strat.split(','):
         p_targets = [
-            [any(phrase['title'][0].lower() == tit.lower() for tit in title) for phrase in phrase_group]
-            for phrase_group, title in zip(phrase_groups, titles)
+            [any(answer in phrase['context'] for answer in answer_set) for phrase in phrase_group]
+            for phrase_group, answer_set in zip(phrase_groups, answers)
         ]
         p_targets = [[ii if val else None for ii, val in enumerate(target)] for target in p_targets]
 
